@@ -1,20 +1,40 @@
 package blockchain
 
 import java.security.MessageDigest
+import kotlin.random.Random
 
-data class Block(val id: Int, val time: Long, val hashPrev: String) {
-    var hash = applySha256("$id $time $hashPrev")
+data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String) {
+    private val magic = magic("$id $time $hashPrev", n)
+    val hash = applySha256("$id $time $hashPrev $magic")
+    private val timeGen = (System.currentTimeMillis() - time) / 1000
     override fun toString(): String {
         return """
             Block:
             Id: $id
             Timestamp: $time
+            Magic number: $magic
             Hash of the previous block:
             $hashPrev
             Hash of the block:
             $hash
+            Block was generating for $timeGen seconds
         """.trimIndent()
     }
+}
+
+fun magic(str: String, n: Int): String {
+    var hash = ""
+    var magic: Int = 0
+    var bool = true
+    l@while (bool) {
+        magic = Random.nextInt(999999999)
+        hash = applySha256("$str $magic")
+        for (i in 0 until n) {
+            if (hash[i] != '0') continue@l
+        }
+        bool = false
+    }
+    return magic.toString()
 }
 
 fun applySha256(input: String): String {
@@ -37,20 +57,20 @@ fun applySha256(input: String): String {
 class Blockchain {
     private val blockchain = mutableListOf<Block>()
 
-    fun generateBlock() {
+    fun generateBlock(n: Int) {
         blockchain += if (blockchain.isEmpty()) {
             run {
                 val id = 1
                 val time = System.currentTimeMillis()
                 val hashPrev = "0"
-                Block(id, time, hashPrev)
+                Block(n, id, time, hashPrev)
             }
         } else {
             run {
                 val id = blockchain.size + 1
                 val time = System.currentTimeMillis()
                 val hashPrev = blockchain.last().hash
-                Block(id, time, hashPrev)
+                Block(n, id, time, hashPrev)
             }
         }
     }
@@ -71,7 +91,10 @@ class Blockchain {
 }
 
 fun main() {
+    print("Enter how many zeros the hash must start with: ")
+    val n = readln().toInt()
+    println()
     val myBlockchain = Blockchain()
-    for (i in 1..5) myBlockchain.generateBlock()
+    for (i in 1..5) myBlockchain.generateBlock(n)
     myBlockchain.printBlocks()
 }
