@@ -3,26 +3,25 @@ package blockchain
 import java.security.MessageDigest
 import kotlin.random.Random
 
-data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String, val nameThread: String) {
-    private val magic = magic("$id $time $hashPrev", n)
-    val hash = applySha256("$id $time $hashPrev $magic")
+data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String, val nameThread: String, val data: String) {
+    private val magic = magic("$id $time $hashPrev $data", n)
+    val hash = applySha256("$id $time $hashPrev $data $magic")
     val timeGen = (System.currentTimeMillis() - time) / 1000
     var optionN = ""
 
     override fun toString(): String {
-        return """
-            Block:
-            Created by miner # $nameThread
-            Id: $id
-            Timestamp: $time
-            Magic number: $magic
-            Hash of the previous block:
-            $hashPrev
-            Hash of the block:
-            $hash
-            Block was generating for $timeGen seconds
-            $optionN
-        """.trimIndent()
+        return """Block:
+Created by miner # $nameThread
+Id: $id
+Timestamp: $time
+Magic number: $magic
+Hash of the previous block:
+$hashPrev
+Hash of the block:
+$hash
+Block data: $data
+Block was generating for $timeGen seconds
+$optionN"""
     }
 }
 
@@ -62,6 +61,10 @@ class Blockchain {
     @Volatile
     var n = 0
     val blockchain = mutableListOf<Block>()
+    @Volatile
+    var data = "no messages"
+    @Volatile
+    var message = ""
 
     @Synchronized fun addBlock(block: Block){
         if (blockchain.isEmpty() || block.hashPrev == blockchain.last().hash) {
@@ -73,6 +76,8 @@ class Blockchain {
                 n--
                 block.optionN = "N was decreased by 1"
             } else block.optionN = "N stays the same"
+            data = message
+            message = ""
             blockchain += block
         }
     }
@@ -83,14 +88,14 @@ class Blockchain {
                 val id = 1
                 val time = System.currentTimeMillis()
                 val hashPrev = "0"
-                Block(n, id, time, hashPrev, Thread.currentThread().name)
+                Block(n, id, time, hashPrev, Thread.currentThread().name, data)
             }
         } else {
             run {
                 val id = blockchain.size + 1
                 val time = System.currentTimeMillis()
                 val hashPrev = blockchain.last().hash
-                Block(n, id, time, hashPrev, Thread.currentThread().name)
+                Block(n, id, time, hashPrev, Thread.currentThread().name, data)
             }
         }
     }
@@ -113,6 +118,7 @@ class Blockchain {
 class Mainer(private val blockchain: Blockchain) : Thread() {
     override fun run() {
         while (blockchain.blockchain.size < 5) {
+            sleep(1000)
             val block = blockchain.generateBlock()
             blockchain.addBlock(block)
         }
@@ -122,6 +128,15 @@ class Mainer(private val blockchain: Blockchain) : Thread() {
 fun main() {
 
     val myBlockchain = Blockchain()
+    val list = listOf(
+        "Tom: Hey, I'm first!",
+        "Sarah: It's not fair!",
+        "Sarah: You always will be first because it is your blockchain!",
+        "Sarah: Anyway, thank you for this amazing chat.",
+        "Tom: You're welcome :)",
+        "Nick: Hey Tom, nice chat",
+        "Hi!!!"
+    )
 
     val mainer1 = Mainer(myBlockchain)
     mainer1.name = "1"
@@ -140,7 +155,10 @@ fun main() {
     mainer4.start()
     mainer5.start()
 
-    while (myBlockchain.blockchain.size < 5) Thread.sleep(1000)
+    while (myBlockchain.blockchain.size < 5) {
+        myBlockchain.message += "\n${list[Random.nextInt(0, list.lastIndex)]}"
+        Thread.sleep(1000)
+    }
 
     myBlockchain.printBlocks()
 
