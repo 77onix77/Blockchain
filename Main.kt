@@ -3,13 +3,16 @@ package blockchain
 import java.security.MessageDigest
 import kotlin.random.Random
 
-data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String) {
+data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String, val nameThread: String) {
     private val magic = magic("$id $time $hashPrev", n)
     val hash = applySha256("$id $time $hashPrev $magic")
-    private val timeGen = (System.currentTimeMillis() - time) / 1000
+    val timeGen = (System.currentTimeMillis() - time) / 1000
+    var optionN = ""
+
     override fun toString(): String {
         return """
             Block:
+            Created by miner # $nameThread
             Id: $id
             Timestamp: $time
             Magic number: $magic
@@ -18,13 +21,14 @@ data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String) 
             Hash of the block:
             $hash
             Block was generating for $timeGen seconds
+            $optionN
         """.trimIndent()
     }
 }
 
 fun magic(str: String, n: Int): String {
-    var hash = ""
-    var magic: Int = 0
+    var hash: String
+    var magic = 0
     var bool = true
     l@while (bool) {
         magic = Random.nextInt(999999999)
@@ -55,22 +59,38 @@ fun applySha256(input: String): String {
 }
 
 class Blockchain {
-    private val blockchain = mutableListOf<Block>()
+    @Volatile
+    var n = 0
+    val blockchain = mutableListOf<Block>()
 
-    fun generateBlock(n: Int) {
-        blockchain += if (blockchain.isEmpty()) {
+    @Synchronized fun addBlock(block: Block){
+        if (blockchain.isEmpty() || block.hashPrev == blockchain.last().hash) {
+
+            if (block.timeGen < 10 && n < 6) {
+                n++
+                block.optionN = "N was increased to $n"
+            } else if (block.timeGen > 20) {
+                n--
+                block.optionN = "N was decreased by 1"
+            } else block.optionN = "N stays the same"
+            blockchain += block
+        }
+    }
+
+    fun generateBlock(): Block {
+        return if (blockchain.isEmpty()) {
             run {
                 val id = 1
                 val time = System.currentTimeMillis()
                 val hashPrev = "0"
-                Block(n, id, time, hashPrev)
+                Block(n, id, time, hashPrev, Thread.currentThread().name)
             }
         } else {
             run {
                 val id = blockchain.size + 1
                 val time = System.currentTimeMillis()
                 val hashPrev = blockchain.last().hash
-                Block(n, id, time, hashPrev)
+                Block(n, id, time, hashPrev, Thread.currentThread().name)
             }
         }
     }
@@ -90,11 +110,38 @@ class Blockchain {
     }
 }
 
+class Mainer(private val blockchain: Blockchain) : Thread() {
+    override fun run() {
+        while (blockchain.blockchain.size < 5) {
+            val block = blockchain.generateBlock()
+            blockchain.addBlock(block)
+        }
+    }
+}
+
 fun main() {
-    print("Enter how many zeros the hash must start with: ")
-    val n = readln().toInt()
-    println()
+
     val myBlockchain = Blockchain()
-    for (i in 1..5) myBlockchain.generateBlock(n)
+
+    val mainer1 = Mainer(myBlockchain)
+    mainer1.name = "1"
+    val mainer2 = Mainer(myBlockchain)
+    mainer2.name = "2"
+    val mainer3 = Mainer(myBlockchain)
+    mainer3.name = "3"
+    val mainer4 = Mainer(myBlockchain)
+    mainer4.name = "4"
+    val mainer5 = Mainer(myBlockchain)
+    mainer5.name = "5"
+
+    mainer1.start()
+    mainer2.start()
+    mainer3.start()
+    mainer4.start()
+    mainer5.start()
+
+    while (myBlockchain.blockchain.size < 5) Thread.sleep(1000)
+
     myBlockchain.printBlocks()
+
 }
