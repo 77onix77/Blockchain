@@ -11,7 +11,8 @@ data class Block(val n: Int, val id: Int, val time: Long, val hashPrev: String, 
 
     override fun toString(): String {
         return """Block:
-Created by miner # $nameThread
+Created by: $nameThread
+$nameThread gets 100 VC
 Id: $id
 Timestamp: $time
 Magic number: $magic
@@ -19,7 +20,8 @@ Hash of the previous block:
 $hashPrev
 Hash of the block:
 $hash
-Block data: $data
+Block data:
+${data.trim()}
 Block was generating for $timeGen seconds
 $optionN"""
     }
@@ -62,23 +64,55 @@ class Blockchain {
     var n = 0
     val blockchain = mutableListOf<Block>()
     @Volatile
-    var data = "no messages"
+    var data = "No transactions"
     @Volatile
     var message = ""
+    private val account = mutableMapOf(
+        "miner1" to 0,
+        "miner2" to 0,
+        "miner3" to 0,
+        "miner4" to 0,
+        "miner5" to 0,
+        "miner6" to 0,
+        "miner7" to 0
+    )
+    private val list = listOf(
+        "miner1",
+        "miner2",
+        "miner3",
+        "miner4",
+        "miner5",
+        "miner6",
+        "miner7"
+    )
+
+    fun transaction() {
+        val payer = list[Random.nextInt(0, 7)]
+        val recipient= list[Random.nextInt(0, 7)]
+        if (payer != recipient && account[payer]!! > 1) {
+            val sum = Random.nextInt(1, account[payer]!!)
+            account[payer] = account[payer]!! - sum
+            account[recipient] = account[recipient]!! + sum
+            message += "$payer sent $sum VC to $recipient\n"
+        }
+    }
 
     @Synchronized fun addBlock(block: Block){
         if (blockchain.isEmpty() || block.hashPrev == blockchain.last().hash) {
 
-            if (block.timeGen < 10 && n < 6) {
+            if (block.timeGen < 5 && n < 4) {
                 n++
                 block.optionN = "N was increased to $n"
-            } else if (block.timeGen > 20) {
+            } else if (block.timeGen > 15) {
                 n--
                 block.optionN = "N was decreased by 1"
             } else block.optionN = "N stays the same"
-            data = message
+            data = message.ifEmpty { "No transactions" }
             message = ""
+            account[Thread.currentThread().name] = account[Thread.currentThread().name]!! + 100
             blockchain += block
+            println(block)
+            println()
         }
     }
 
@@ -100,25 +134,15 @@ class Blockchain {
         }
     }
 
-    private fun controlBlocks(): Boolean {
-        var res = true
-        for (i in blockchain.lastIndex downTo 1) {
-            if (blockchain[i].hashPrev != blockchain[i - 1].hash) res = false
-        }
-        return res
-    }
 
-    fun printBlocks() {
-        if (controlBlocks()) {
-            println(blockchain.joinToString("\n\n"))
-        } else println("ERROR blockchain")
-    }
+
+
 }
 
-class Mainer(private val blockchain: Blockchain) : Thread() {
+class Miner(private val blockchain: Blockchain) : Thread() {
     override fun run() {
-        while (blockchain.blockchain.size < 5) {
-            sleep(1000)
+        while (blockchain.blockchain.size < 15) {
+            sleep(500)
             val block = blockchain.generateBlock()
             blockchain.addBlock(block)
         }
@@ -126,40 +150,33 @@ class Mainer(private val blockchain: Blockchain) : Thread() {
 }
 
 fun main() {
-
     val myBlockchain = Blockchain()
-    val list = listOf(
-        "Tom: Hey, I'm first!",
-        "Sarah: It's not fair!",
-        "Sarah: You always will be first because it is your blockchain!",
-        "Sarah: Anyway, thank you for this amazing chat.",
-        "Tom: You're welcome :)",
-        "Nick: Hey Tom, nice chat",
-        "Hi!!!"
-    )
 
-    val mainer1 = Mainer(myBlockchain)
-    mainer1.name = "1"
-    val mainer2 = Mainer(myBlockchain)
-    mainer2.name = "2"
-    val mainer3 = Mainer(myBlockchain)
-    mainer3.name = "3"
-    val mainer4 = Mainer(myBlockchain)
-    mainer4.name = "4"
-    val mainer5 = Mainer(myBlockchain)
-    mainer5.name = "5"
+    val miner1 = Miner(myBlockchain)
+    miner1.name = "miner1"
+    val miner2 = Miner(myBlockchain)
+    miner2.name = "miner2"
+    val miner3 = Miner(myBlockchain)
+    miner3.name = "miner3"
+    val miner4 = Miner(myBlockchain)
+    miner4.name = "miner4"
+    val miner5 = Miner(myBlockchain)
+    miner5.name = "miner5"
+    val miner6 = Miner(myBlockchain)
+    miner6.name = "miner6"
+    val miner7 = Miner(myBlockchain)
+    miner7.name = "miner7"
 
-    mainer1.start()
-    mainer2.start()
-    mainer3.start()
-    mainer4.start()
-    mainer5.start()
+    miner1.start()
+    miner2.start()
+    miner3.start()
+    miner4.start()
+    miner5.start()
+    miner6.start()
+    miner7.start()
 
-    while (myBlockchain.blockchain.size < 5) {
-        myBlockchain.message += "\n${list[Random.nextInt(0, list.lastIndex)]}"
-        Thread.sleep(1000)
+    while (myBlockchain.blockchain.size < 15) {
+        myBlockchain.transaction()
+        Thread.sleep(200)
     }
-
-    myBlockchain.printBlocks()
-
 }
